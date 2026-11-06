@@ -9,6 +9,8 @@ import {
   WAITLIST_SUBMIT,
 } from '@/content/launchpad';
 import { NavLogo } from '@/components/nav/NavLogo';
+import { fieldError } from '@/lib/formValidation';
+import { submitLaunchpadForm } from '@/lib/launchpad-api';
 
 /**
  * `/launchpad` Page — Exact 1:1 UI matched to official reference screenshot.
@@ -23,7 +25,9 @@ export default function LaunchpadPage() {
     industry: '',
   });
 
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [statusMessage, setStatusMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [activeSlide, setActiveSlide] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -59,12 +63,72 @@ export default function LaunchpadPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitted(true);
-    setTimeout(() => {
-      setIsSubmitted(false);
-    }, 5000);
+
+    // Validate fields client-side
+    const newErrors: Record<string, string> = {};
+    for (const field of WAITLIST_FIELDS) {
+      const err = fieldError(field, formData[field.id] || '');
+      if (err) {
+        newErrors[field.id] = err;
+      }
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setFieldErrors(newErrors);
+      return;
+    }
+
+    setFieldErrors({});
+    setStatus('loading');
+    setStatusMessage('');
+
+    try {
+      const result = await submitLaunchpadForm({
+        full_name: (formData['full-name'] || '').trim(),
+        name: (formData['full-name'] || '').trim(),
+        email: (formData.email || '').trim(),
+        whatsapp_number: (formData.whatsapp || '').trim(),
+        whatsapp: (formData.whatsapp || '').trim(),
+        phone: (formData.whatsapp || '').trim(),
+        startup_name: (formData['startup-name'] || '').trim(),
+        startup: (formData['startup-name'] || '').trim(),
+        industry: (formData.industry || '').trim(),
+      });
+
+      if (result.success) {
+        setStatus('success');
+        setStatusMessage(result.message);
+        setFormData({
+          'full-name': '',
+          email: '',
+          whatsapp: '',
+          'startup-name': '',
+          industry: '',
+        });
+      } else {
+        setStatus('error');
+        setStatusMessage(result.message);
+        if (result.errors) {
+          const mappedErrors: Record<string, string> = {};
+          for (const [key, val] of Object.entries(result.errors)) {
+            const msg = (Array.isArray(val) ? val[0] : String(val)) || '';
+            if (msg) {
+              if (key === 'full_name' || key === 'name') mappedErrors['full-name'] = msg;
+              else if (key === 'whatsapp_number' || key === 'whatsapp' || key === 'phone') mappedErrors.whatsapp = msg;
+              else if (key === 'startup_name' || key === 'startup') mappedErrors['startup-name'] = msg;
+              else mappedErrors[key] = msg;
+            }
+          }
+          setFieldErrors(mappedErrors);
+        }
+      }
+    } catch (err) {
+      console.error('Launchpad submission error:', err);
+      setStatus('error');
+      setStatusMessage('Unable to connect to the server. Please check your connection and try again.');
+    }
   };
 
   return (
@@ -750,9 +814,10 @@ export default function LaunchpadPage() {
               {/* Right Column: Waitlist Form Card with Input Icons */}
               <div {...reveal} style={stagger(2)} className="lg:col-span-7 w-full z-10">
                 <div className="rounded-xl border border-[#2ABD00]/30 bg-[#041508]/90 p-4 sm:p-6 lg:p-7 backdrop-blur-xl shadow-[0_10px_35px_rgba(0,0,0,0.85)]">
-                  <form onSubmit={handleSubmit} className="space-y-3.5">
+                  <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
                     {WAITLIST_FIELDS.map((field) => {
                       const isDropdown = field.id === 'industry';
+                      const error = fieldErrors[field.id];
 
                       return (
                         <div key={field.id}>
@@ -809,8 +874,21 @@ export default function LaunchpadPage() {
                                 id={field.id}
                                 required={field.required}
                                 value={formData[field.id] || ''}
-                                onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
-                                className="w-full pl-9 pr-9 py-2.5 sm:py-3 rounded-sm bg-[#020b04] border border-[#2ABD00]/35 text-xs text-white focus:outline-none focus:border-[#2ABD00] focus:ring-1 focus:ring-[#2ABD00] transition-all appearance-none cursor-pointer"
+                                onChange={(e) => {
+                                  setFormData({ ...formData, [field.id]: e.target.value });
+                                  if (fieldErrors[field.id]) {
+                                    setFieldErrors((prev) => {
+                                      const next = { ...prev };
+                                      delete next[field.id];
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                className={`w-full pl-9 pr-9 py-2.5 sm:py-3 rounded-sm bg-[#020b04] border text-xs text-white focus:outline-none transition-all appearance-none cursor-pointer ${
+                                  error
+                                    ? 'border-red-500/80 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                                    : 'border-[#2ABD00]/35 focus:border-[#2ABD00] focus:ring-1 focus:ring-[#2ABD00]'
+                                }`}
                               >
                                 <option value="" disabled className="bg-[#020b04] text-qx-grey">
                                   Select your industry
@@ -830,8 +908,21 @@ export default function LaunchpadPage() {
                                 required={field.required}
                                 placeholder={field.id === 'whatsapp' ? '+91 98765 43210' : `Enter your ${field.label.toLowerCase()}`}
                                 value={formData[field.id] || ''}
-                                onChange={(e) => setFormData({ ...formData, [field.id]: e.target.value })}
-                                className="w-full pl-9 pr-3.5 py-2.5 sm:py-3 rounded-sm bg-[#020b04] border border-[#2ABD00]/35 text-xs text-white placeholder:text-qx-grey/50 focus:outline-none focus:border-[#2ABD00] focus:ring-1 focus:ring-[#2ABD00] transition-all"
+                                onChange={(e) => {
+                                  setFormData({ ...formData, [field.id]: e.target.value });
+                                  if (fieldErrors[field.id]) {
+                                    setFieldErrors((prev) => {
+                                      const next = { ...prev };
+                                      delete next[field.id];
+                                      return next;
+                                    });
+                                  }
+                                }}
+                                className={`w-full pl-9 pr-3.5 py-2.5 sm:py-3 rounded-sm bg-[#020b04] border text-xs text-white placeholder:text-qx-grey/50 focus:outline-none transition-all ${
+                                  error
+                                    ? 'border-red-500/80 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                                    : 'border-[#2ABD00]/35 focus:border-[#2ABD00] focus:ring-1 focus:ring-[#2ABD00]'
+                                }`}
                               />
                             )}
 
@@ -844,28 +935,72 @@ export default function LaunchpadPage() {
                               </div>
                             )}
                           </div>
+                          {error && (
+                            <p className="font-mono text-[10px] text-red-400 mt-1">
+                              {error}
+                            </p>
+                          )}
                         </div>
                       );
                     })}
 
+                    {/* Status Feedback Messages */}
+                    {status === 'success' && (
+                      <div
+                        role="status"
+                        className="p-3.5 rounded-lg border border-[#2ABD00] bg-[#06260f]/90 text-[#2ABD00] text-xs font-mono flex items-start gap-2.5 shadow-[0_0_15px_rgba(42,189,0,0.25)]"
+                      >
+                        <svg className="w-4 h-4 text-[#2ABD00] shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <div className="flex-1 leading-relaxed">
+                          {statusMessage}
+                        </div>
+                      </div>
+                    )}
+
+                    {status === 'error' && (
+                      <div
+                        role="alert"
+                        className="p-3.5 rounded-lg border border-red-500/70 bg-red-950/40 text-red-300 text-xs font-mono flex items-start gap-2.5 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                      >
+                        <svg className="w-4 h-4 text-red-400 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="12" />
+                          <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <div className="flex-1 leading-relaxed">
+                          {statusMessage}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Neon Green Submit Button matching reference design */}
                     <button
                       type="submit"
-                      className="w-full py-2.5 sm:py-3 rounded-sm bg-[#2ABD00] font-mono text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-black hover:shadow-[0_0_25px_rgba(42,189,0,0.5)] hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(42,189,0,0.35)] mt-2.5"
+                      disabled={status === 'loading'}
+                      className={`w-full py-2.5 sm:py-3 rounded-sm bg-[#2ABD00] font-mono text-[11px] sm:text-xs font-extrabold uppercase tracking-wider text-black hover:shadow-[0_0_25px_rgba(42,189,0,0.5)] hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(42,189,0,0.35)] mt-2.5 ${
+                        status === 'loading' ? 'opacity-70 cursor-not-allowed' : ''
+                      }`}
                     >
-                      <span>{WAITLIST_SUBMIT}</span>
-                      <svg className="w-3.5 h-3.5 fill-none stroke-current stroke-[2.5]" viewBox="0 0 24 24">
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                        <polyline points="12 5 19 12 12 19" />
-                      </svg>
+                      {status === 'loading' ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-black" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          <span>Submitting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{WAITLIST_SUBMIT}</span>
+                          <svg className="w-3.5 h-3.5 fill-none stroke-current stroke-[2.5]" viewBox="0 0 24 24">
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                            <polyline points="12 5 19 12 12 19" />
+                          </svg>
+                        </>
+                      )}
                     </button>
-
-                    {/* Submission Toast Feedback */}
-                    {isSubmitted && (
-                      <div className="p-3 rounded-lg border border-[#2ABD00] bg-[#06260f] text-[#2ABD00] text-xs font-mono text-center animate-fade-in">
-                        ✓ Thank you! You&apos;ve been added to the QAVYX Launchpad waitlist queue.
-                      </div>
-                    )}
                   </form>
                 </div>
               </div>

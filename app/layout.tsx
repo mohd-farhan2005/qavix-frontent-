@@ -49,6 +49,7 @@ import '@/styles/pillar-spine.css';
 // own `md:grid-cols-*` utility, which is a media-query rule of identical
 // specificity. Only source order separates them.
 import '@/styles/short-viewport.css';
+import '@/styles/blog.css';
 
 /**
  * The site-wide metadata defaults, and the homepage's own.

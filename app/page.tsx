@@ -3,6 +3,8 @@ import { OpenAtTop } from '@/components/home/OpenAtTop';
 import { SiteIndex } from '@/components/home/SiteIndex';
 // import { TrustStrip } from '@/components/home/TrustStrip';
 import { WhoWeServe } from '@/components/home/WhoWeServe';
+import { BlogPreview } from '@/components/home/BlogPreview';
+import { HomeFaqWrapper } from '@/components/home/HomeFaqWrapper';
 import { WhyQavyx } from '@/components/home/WhyQavyx';
 import { HeroMount } from '@/components/hero/HeroMount';
 import { HeroStatic } from '@/components/hero/HeroStatic';
@@ -177,7 +179,9 @@ export default function Home() {
       */}
       <WhyQavyx />
       <WhoWeServe />
+      <BlogPreview />
       <SiteIndex />
+      <HomeFaqWrapper />
       <FinalCta />
     </main>
   );

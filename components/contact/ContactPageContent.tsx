@@ -12,6 +12,7 @@ import { CONTACT_FORM_FIELDS, CONTACT_FORM_SUBMIT, CONTACT_PAGE } from '@/conten
 import { CONTACT } from '@/content/site';
 import { WHATSAPP_HREF } from '@/components/nav/WhatsAppLink';
 import { fieldError } from '@/lib/formValidation';
+import { API_BASE_URL } from '@/lib/blog-api';
 import type { FormField } from '@/types/forms';
 
 export function ContactPageContent() {
@@ -21,7 +22,65 @@ export function ContactPageContent() {
   const [values, setValues] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [selectOpen, setSelectOpen] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const [statusMessage, setStatusMessage] = useState('');
   const selectRef = useRef<HTMLDivElement>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const newTouched: Record<string, boolean> = {};
+    let hasError = false;
+    for (const field of CONTACT_FORM_FIELDS) {
+      newTouched[field.id] = true;
+      if (fieldError(field, values[field.id] ?? '')) {
+        hasError = true;
+      }
+    }
+    setTouched(newTouched);
+    if (hasError) return;
+
+    setStatus('sending');
+    setStatusMessage('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          name: values.name || '',
+          email: values.email || '',
+          phone: values.whatsapp || '',
+          subject: values['service-interest']
+            ? `Inquiry: ${values['service-interest']}`
+            : values['business-name']
+            ? `Inquiry from ${values['business-name']}`
+            : 'Website Inquiry',
+          message: [
+            values['business-name'] ? `Business: ${values['business-name']}` : null,
+            values['service-interest'] ? `Interest: ${values['service-interest']}` : null,
+            values.message ? `Message: ${values.message}` : null,
+          ]
+            .filter(Boolean)
+            .join('\n\n') || 'Customer request from website.',
+        }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setStatus('success');
+        setStatusMessage(data.message || 'Thank you! Your message was received.');
+        setValues({});
+        setTouched({});
+      } else {
+        setStatus('error');
+        setStatusMessage(data.message || 'Failed to send message. Please try again.');
+      }
+    } catch {
+      setStatus('error');
+      setStatusMessage('Failed to send message. Please try again or reach out on WhatsApp.');
+    }
+  };
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -215,9 +274,21 @@ export function ContactPageContent() {
                 <form
                   aria-label={CONTACT_PAGE.cta}
                   noValidate
-                  onSubmit={(e) => e.preventDefault()}
+                  onSubmit={handleSubmit}
                   className="flex flex-col gap-2.5 w-full"
                 >
+                  {status === 'success' && (
+                    <div className="p-3 rounded-[3px] border border-[#2ABD00] bg-[#2ABD00]/15 text-[#2ABD00] text-xs font-mono mb-1 flex items-center gap-2">
+                      <span className="font-bold">✓</span>
+                      <span>{statusMessage}</span>
+                    </div>
+                  )}
+                  {status === 'error' && (
+                    <div className="p-3 rounded-[3px] border border-red-500/60 bg-red-900/20 text-red-300 text-xs font-mono mb-1 flex items-center gap-2">
+                      <span className="font-bold">!</span>
+                      <span>{statusMessage}</span>
+                    </div>
+                  )}
                   {/* Field 1: NAME */}
                   {(() => {
                     const field = CONTACT_FORM_FIELDS[0]!;
@@ -584,11 +655,11 @@ export function ContactPageContent() {
                   <div className="pt-2 w-full">
                     <button
                       type="submit"
-                      disabled
+                      disabled={status === 'sending'}
                       aria-describedby={noticeId}
                       className="w-full h-[42px] rounded-[3px] font-mono text-xs sm:text-[13px] uppercase tracking-[0.25em] font-bold text-white bg-gradient-to-r from-[#0d3b14] via-[#1a6e24] to-[#0d3b14] border border-[#2ABD00]/70 shadow-[0_0_16px_rgba(42,189,0,0.22)] hover:shadow-[0_0_24px_rgba(42,189,0,0.38)] hover:border-[#2ABD00] transition-all flex items-center justify-center cursor-pointer select-none px-4"
                     >
-                      <span>{CONTACT_FORM_SUBMIT}</span>
+                      <span>{status === 'sending' ? 'SENDING...' : CONTACT_FORM_SUBMIT}</span>
                     </button>
                     {/* Screen reader notification for accessibility */}
                     <p id={noticeId} className="sr-only">

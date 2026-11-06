@@ -66,6 +66,7 @@ export const PRIMARY_NAV: readonly NavItem[] = [
   { href: '/launch', label: 'Launch' },
   { href: '/who-we-are', label: 'Who We Are' },
   { href: '/projects', label: 'Our Projects' },
+  { href: '/blog', label: 'Blog' },
   { href: '/services', label: 'Our Services' },
   { href: '/faq', label: 'FAQ' },
 ] as const;
@@ -135,6 +136,7 @@ export const SITE_INDEX = {
   pages: [
     { href: '/who-we-are', label: 'Who We Are' },
     { href: '/projects', label: 'Our Projects' },
+  { href: '/blog', label: 'Blog' },
     { href: '/services', label: 'Our Services' },
     { href: '/faq', label: 'FAQ' },
     CONTACT_NAV,
@@ -181,6 +183,7 @@ export const MENU_NAV: readonly NavItem[] = [
   { href: '/', label: 'Home' },
   { href: '/who-we-are', label: 'Who We Are' },
   { href: '/projects', label: 'Our Projects' },
+  { href: '/blog', label: 'Blog' },
   ...SITE_INDEX.pillars,
   { href: '/launchpad', label: 'Launchpad' },
   { href: '/faq', label: 'FAQ' },
@@ -363,6 +366,7 @@ export const ALL_ROUTES: readonly SiteRoute[] = [
   { path: '/who-we-are/contact', indexed: true },
   { path: '/projects', indexed: true },
   { path: '/services', indexed: true },
+  { path: '/blog', indexed: true },
   { path: '/faq', indexed: true },
   { path: '/launchpad', indexed: true },
   { path: '/privacy-policy', indexed: true },
